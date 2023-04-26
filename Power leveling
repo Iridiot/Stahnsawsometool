@@ -1,0 +1,64 @@
+Param(
+ [switch]$save_cache,
+ [int]$num_slots=12
+)
+
+$cache_file="$PSScriptRoot\gbData.json"
+$cache_file2="$PSScriptRoot\gbShort.json"
+
+if ($save_cache.IsPresent -or ! (test-path $cache_file) -or ! (test-path $cache_file2)) {
+ Retrieve-GbData
+ $gbData|ConvertTo-Json -Depth 99 -Compress | sc $cache_file
+ 
+ Retrieve-GbShortNames
+ $shortnames|ConvertTo-Json -Compress | sc $cache_file2
+} else {
+ $gbData = gc $cache_file | ConvertFrom-Json
+ $shortnames = gc $cache_file2 | ConvertFrom-Json
+}
+
+function CycleNames{
+ $tName = $script:names[0]
+ $script:names = $script:names[1..($script:names.Count - 1)]
+ $script:names += $tName
+}
+
+function CycleSlots{
+ $script:names = @()
+ $script:sourceIDs=@()
+
+ $slot=1
+ while ($slot -le $num_slots) {
+  $tCkb=$grpNames.controls["ckbKeep$slot"]
+  $tTxt=$grpNames.controls["txtName$slot"]
+  if (! $tckb.Checked -and -not $tTxt.Text) {
+   $nextCkb = $grpNames.controls["ckbKeep$($slot+1)"]
+   $nextTxt = $grpNames.controls["txtName$($slot+1)"]
+   if (! $nextCkb.Checked -and $nextTxt.text) {
+    $tTxt.text = $nextTxt.text
+    $nextTxt.text = ''
+   }
+  }
+  $slot++
+ }
+
+ 1..$num_slots|%{
+  $tCkb = $grpNames.controls["ckbKeep$_"]
+  if (! $tCkb.Checked) {
+   $tName = $grpNames.controls["txtName$_"].text
+   
+   if ($tName) {
+    $script:names += $tName
+    $sourceIDs += $_
+   }
+  }
+ }
+ 
+ CycleNames
+
+ foreach ($sourceID in $sourceIDs){
+  $grpNames.controls["txtName$sourceID"].text = $script:names[$sourceIDs.indexof($sourceID)]
+ }
+
+ $numGBLvl.Value++
+}
